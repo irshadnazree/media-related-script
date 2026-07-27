@@ -42,6 +42,7 @@ SUPPORTED_EXTENSIONS = {
     ".png",
     ".gif",
     ".bmp",
+    ".tif",
     ".tiff",
     ".webp",
     ".ico",
@@ -191,9 +192,15 @@ class ImageProcessor:
 class BatchProcessor:
     """Handles batch processing of multiple images."""
 
-    def __init__(self, processor: ImageProcessor, output_dir: Path):
+    def __init__(
+        self,
+        processor: ImageProcessor,
+        output_dir: Path,
+        input_root: Optional[Path] = None,
+    ):
         self.processor = processor
         self.output_dir = output_dir
+        self.input_root = input_root
 
     def process_batch(
         self,
@@ -271,7 +278,12 @@ class BatchProcessor:
         if total == 1 and not config.rename and not config.convert:
             name_part = f"{name_part}_processed"
 
-        return self.output_dir / f"{name_part}{extension}"
+        output_parent = self.output_dir
+        if self.input_root and not config.rename:
+            output_parent /= input_path.relative_to(self.input_root).parent
+
+        output_parent.mkdir(parents=True, exist_ok=True)
+        return output_parent / f"{name_part}{extension}"
 
 
 class InputHandler:
@@ -383,7 +395,7 @@ class InputHandler:
 
 
 def collect_image_files(path: Path) -> List[Path]:
-    """Collect all image files from path (file or directory)."""
+    """Collect supported image files from a file or directory tree."""
     if path.is_file():
         if path.suffix.lower() in SUPPORTED_EXTENSIONS:
             return [path]
@@ -392,11 +404,16 @@ def collect_image_files(path: Path) -> List[Path]:
             return []
 
     if path.is_dir():
-        images = [
-            f
-            for f in path.iterdir()
-            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
-        ]
+        output_dir = path / f"{path.name}_processed"
+        images = []
+        for file_path in path.rglob("*"):
+            if output_dir in file_path.parents:
+                continue
+            if (
+                file_path.is_file()
+                and file_path.suffix.lower() in SUPPORTED_EXTENSIONS
+            ):
+                images.append(file_path)
         return sorted(images)
 
     return []
@@ -450,7 +467,8 @@ def main():
         output_dir = setup_output_directory(input_path)
 
         processor = ImageProcessor(config)
-        batch_processor = BatchProcessor(processor, output_dir)
+        input_root = input_path if input_path.is_dir() else None
+        batch_processor = BatchProcessor(processor, output_dir, input_root)
         successful, failed = batch_processor.process_batch(image_files, config)
 
         print("\n" + "=" * 50)
