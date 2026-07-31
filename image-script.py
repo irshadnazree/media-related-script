@@ -3,6 +3,7 @@
 # requires-python = ">=3.9"
 # dependencies = [
 #     "pillow>=10.0.0",
+#     "pillow-heif>=0.18.0",
 #     "tqdm>=4.66.0",
 # ]
 # ///
@@ -21,7 +22,10 @@ import concurrent.futures
 import multiprocessing
 
 from PIL import Image
+from pillow_heif import register_heif_opener
 from tqdm import tqdm
+
+register_heif_opener()
 
 
 class ImageFormat(Enum):
@@ -42,6 +46,8 @@ SUPPORTED_EXTENSIONS = {
     ".png",
     ".gif",
     ".bmp",
+    ".heic",
+    ".heif",
     ".tif",
     ".tiff",
     ".webp",
